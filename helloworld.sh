@@ -1,3 +1,4 @@
-#!bin/bash
-# My first script
-echo 'Hello World'
+#!/bin/bash
+# this is my first script
+
+echo "Hello World!"
