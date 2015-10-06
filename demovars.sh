@@ -24,4 +24,4 @@ read -p "Which element of the colours array would you like to use? " num
 #Display some data elemnts from both arrays using the index num
 echo "The first colour in the array is ${colours[$num]} and it can"
 echo " be used to find the ${colours[$num]} animal which is the "
-echo " ${animals[${colours[$num]]}"
+echo " ${animals[${colours[$num]}]}"
