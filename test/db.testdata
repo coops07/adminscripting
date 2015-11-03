@@ -1,0 +1,15 @@
+;
+;
+;Zone file - test123
+;Created on Tue Nov  3 00:08:43 UTC 2015
+;
+$TTL     172800
+@       IN      SOA      ns1.test123. hostmaster@test123. (
+                        2015110200      ; Serial
+			 604800		; Refresh
+			  86400		; Retry
+			2419200		; Expire
+			  86400 )	; Negative Cache TTL
+;
+@	    IN	    NS	ns1.test123.
+2	    IN	    PTR	ns1.test123.
