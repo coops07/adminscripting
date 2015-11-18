@@ -23,7 +23,7 @@ else
     sudo apt-get update
     echo
     echo
-    sudo apt-get install bind9 -y
+    sudo apt-get install bind9 bind9utils -y 
     echo
     echo "Bind has now been installed" 
     echo
@@ -39,7 +39,8 @@ if [ $userdomname = "" ]; then
     echo "Please enter a valid domain name and try again"
     echo
     exit 1
-    
+fi
+
  #   noname=($userdomname)
 #done
 #no name/error  detection?
@@ -74,10 +75,11 @@ sudo sed -i "6 c\$TTL     172800" /etc/bind/db.$userdomname
 #set origin, admin email, and configure hostnames
 db_wwwip="192.168.47.91"
 db_mailip="192.168.59.5"
-sudo sed -i "/SOA/c\@       IN      SOA      ns1.$userdomname. hostmaster@$userdomname. (" /etc/bind/db.$userdomname
+sudo sed -i "/SOA/c\@       IN      SOA      ns1.$userdomname. hostmaster.$userdomname. (" /etc/bind/db.$userdomname
 sudo sed -i "/Serial/c\                        2015110200      ; Serial" /etc/bind/db.$userdomname
+sudo sed -i "s/localhost./ns1.$userdomname./" /etc/bind/db.$userdomname
 sudo sed -i "$ a\ns1     IN      A       127.0.0.1" /etc/bind/db.$userdomname
-sudo sed -i "$ a\;" /etc/bind/db.$userdomname
+#sudo sed -i "$ a\;" /etc/bind/db.$userdomname
 sudo sed -i "$ a\www     IN      A       $db_wwwip" /etc/bind/db.$userdomname
 sudo sed -i "$ a\mail    IN      A       $db_mailip" /etc/bind/db.$userdomname
 echo
@@ -102,16 +104,16 @@ echo
 echo "Creating reverse zone files..."
 echo
 #create and configure www reverse zone
-sudo cp /etc/bind/db.$userdomname /etc/bind/db.$db_wwwip
-sudo sed -i '14,18d' /etc/bind/db.$db_wwwip
-sudo sed -i "$ a\@	    IN	    NS	ns1.$userdomname." /etc/bind/db.$db_wwwip
-sudo sed -i "$ a\2	    IN	    PTR	ns1.$userdomname." /etc/bind/db.$db_wwwip
+sudo cp /etc/bind/db.$userdomname /etc/bind/db.192.168.47
+sudo sed -i '14,18d' /etc/bind/db.192.168.47
+sudo sed -i "$ a\@	    IN	    NS	ns1.$userdomname." /etc/bind/db.192.168.47
+sudo sed -i "$ a\91	    IN	    PTR www.$userdomname." /etc/bind/db.192.168.47
 
 #create and configure mail reverse zone
-sudo cp /etc/bind/db.$userdomname /etc/bind/db.$db_mailip
-sudo sed -i '14,18d' /etc/bind/db.$db_mailip
-sudo sed -i "$ a\@	    IN	    NS	    ns1.$userdomname." /etc/bind/db.$db_mailip
-sudo sed -i "$ a\2	    IN	    PTR	    ns1.$userdomname." /etc/bind/db.$db_mailip
+sudo cp /etc/bind/db.$userdomname /etc/bind/db.192.168.59
+sudo sed -i '14,18d' /etc/bind/db.192.168.59
+sudo sed -i "$ a\@	    IN	    NS	    ns1.$userdomname." /etc/bind/db.192.168.59
+sudo sed -i "$ a\5	    IN	    PTR	    mail.$userdomname." /etc/bind/db.192.168.59
 echo "Zone files created"
 echo
 #verify configurations for syntax
@@ -131,24 +133,26 @@ fi
 #add the new zones to named.conf.local
 echo
 echo "Finalizing configuration..."
-#sudo cp /etc/bind/named.conf.local /etc/bind/named.conf.local2
 echo
+
 # $userdomname zone
-sudo sed -i '$ a\zone "'"$userdomname:"'" {' /etc/bind/named.conf.local
-sudo sed -i "$ a\type master;" /etc/bind/named.conf.local
-sudo sed -i '$ a\file "'"/etc/bind/db.$userdomname"'";' /etc/bind/named.conf.local
+sudo sed -i "$ a\ " /etc/bind/named.conf.local
+sudo sed -i "$ a\zone \"$userdomname\" {" /etc/bind/named.conf.local
+sudo sed -i "$ a\   type master;" /etc/bind/named.conf.local
+sudo sed -i "$ a\   file \"/etc/bind/db.$userdomname\";" /etc/bind/named.conf.local
 sudo sed -i "$ a\};" /etc/bind/named.conf.local
 
 # www zone
-sudo sed -i '$ a\zone "'"$db_wwwip.in-addr.arpa"'" {' /etc/bind/named.conf.local
-sudo sed -i "$ a\type master;" /etc/bind/named.conf.local
-sudo sed -i '$ a\file "'"/etc/bind/db.$db_wwwip"'";' /etc/bind/named.conf.local
+sudo sed -i "$ a\ " /etc/bind/named.conf.local
+sudo sed -i "$ a\zone \"47.168.192.in-addr.arpa\" {" /etc/bind/named.conf.local
+sudo sed -i "$ a\   type master;" /etc/bind/named.conf.local
+sudo sed -i "$ a\   file \"/etc/bind/db.192.168.47\";" /etc/bind/named.conf.local
 sudo sed -i "$ a\};" /etc/bind/named.conf.local
 
 # mail zone
-sudo sed -i '$ a\zone "'"$db_mailip.in-addr.arpa"'" {' /etc/bind/named.conf.local
-sudo sed -i "$ a\type master;" /etc/bind/named.conf.local
-sudo sed -i '$ a\file "'"/etc/bind/db.$db_mailip"'";' /etc/bind/named.conf.local
+sudo sed -i "$ a\zone \"59.168.192.in-addr.arpa\" {" /etc/bind/named.conf.local
+sudo sed -i "$ a\   type master;" /etc/bind/named.conf.local
+sudo sed -i "$ a\   file \"/etc/bind/db.192.168.59\";" /etc/bind/named.conf.local
 sudo sed -i "$ a\};" /etc/bind/named.conf.local
 
 echo "Configuration complete"
@@ -156,12 +160,61 @@ echo
 #reload Bind
 echo "Restarting service..."
 echo
-sudo rndc reload
-echo
-echo "Done"
-echo
+if [[ $(sudo rndc reload) ]]; then
+    echo
+    echo "Reload complete"
+    echo
+else
+    echo "Reload failed"
+    echo
+    exit 1
+fi
+
 #nslookup test for the new names
+echo 
 echo "Testing configuration..."
 echo
-nslookup www.$userdomname localhost
-nslookup mail.$userdomname localhost
+#user domain test
+if [[ $(nslookup ns1.$userdomname localhost) ]]; then
+    echo
+    echo "$userdomname zone found"
+else
+    echo
+    echo  "$userdomname zone not found"
+fi
+#www test
+if [[ $(nslookup www.$userdomname localhost) ]]; then
+    echo
+    echo "www zone found"
+else
+    echo
+    echo  "www zone not found"
+fi
+#mail test
+if [[ $(nslookup mail.$userdomname localhost) ]]; then
+    echo
+    echo "mail zone found"
+else
+    echo
+    echo  "mail zone not found"
+fi
+#reverse www test
+if [[ $(nslookup 192.168.47.91 localhost) ]]; then
+    echo
+    echo "$userdomname zone found"
+else
+    echo
+    echo  "$userdomname zone not found"
+fi
+#reverse mail test
+if [[ $(nslookup 192.168.59.5 localhost) ]]; then
+    echo
+    echo "$userdomname zone found"
+else
+    echo
+    echo  "$userdomname zone not found"
+fi
+
+echo
+echo "Test Complete"
+exit 0
